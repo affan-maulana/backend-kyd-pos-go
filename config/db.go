@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/wpcodevo/golang-fiber-jwt/internal/modules/entity"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -24,13 +23,12 @@ func ConnectDB(cfg *AppConfig) {
 		os.Exit(1)
 	}
 
-	DB.Exec("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
 	DB.Logger = logger.Default.LogMode(logger.Info)
 
 	log.Println("Running Migrations")
-	err = DB.AutoMigrate(&entity.User{})
-	if err != nil {
-		log.Fatal("Migration Failed:  \n", err.Error())
+	dbURL := fmt.Sprintf("postgres://%s@%s:%s/%s?sslmode=disable", cfg.DBUserName, cfg.DBHost, cfg.DBPort, cfg.DBName)
+	if err := RunMigrations(dbURL); err != nil {
+		log.Fatal("Migration Failed: \n", err.Error())
 		os.Exit(1)
 	}
 

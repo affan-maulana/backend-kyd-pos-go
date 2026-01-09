@@ -1,32 +1,104 @@
-# Golang, GORM, & Fiber: JWT Authentication
+# Moka POS Backend with Go Fiber
+Moka POS Backend
 
-In this comprehensive guide, you'll learn how to implement JWT (JSON Web Token) authentication in a Golang application using GORM and the Fiber web framework. The REST API will be powered by a high-performance Fiber HTTP server, offering endpoints dedicated to secure user authentication, and persist data in a PostgreSQL database.
+## Getting Started
 
-![Golang, GORM, & Fiber: JWT Authentication](https://codevoweb.com/wp-content/uploads/2023/01/Golang-GORM-Fiber-JWT-Authentication.webp)
+### Prerequisites
+- Go 1.19+
+- PostgreSQL 12+
+- Make (optional)
 
-## Topics Covered
+### Installation
 
-- Run the Golang & Fiber JWT Auth Project
-- Setup the Golang Project
-- Setup PostgreSQL and pgAdmin with Docker
-- Create the GORM Model
-- Database Migration with GORM
-    - Load the Environment Variables with Viper
-    - Create the Database Pool with GORM
-    - Migrate the GORM Model to the Database
-- Create the JWT Authentication Controllers
-    - SignUp User Fiber Context Handler
-    - SignIn User Fiber Context Handler
-    - Logout User Fiber Context Handler
-- Get the Authenticated User
-- Create the JWT Middleware Guard
-- Register the Routes and Add CORS
-- Testing the JWT Authentication Flow
-    - Register a New Account
-    - Log into the Account
-    - Access Protected Routes
-    - Logout from the API
+1. Clone the repository
+2. Install dependencies:
+```bash
+$ go mod download
+```
+
+3. Set up environment variables (create `.env` file)
+```
+DB_HOST=localhost
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_NAME=moka_pos
+DB_PORT=5432
+```
+
+### Running the Application
+
+```bash
+$ go run ./cmd/main.go
+```
+
+The application will automatically run all pending database migrations on startup.
+
+## Database Migrations
+
+This project uses `golang-migrate/migrate` for database version control.
+
+### How Migrations Work
+
+Migrations are automatically executed when the application starts. The migration files are located in the `migrations/` directory.
+
+### Creating New Migrations
+
+1. **Create migration files** in the `migrations/` directory following the naming convention:
+   ```
+   000002_create_posts_table.up.sql
+   000002_create_posts_table.down.sql
+   ```
+   - `up.sql` - Creates/modifies database schema
+   - `down.sql` - Rolls back the changes
+
+2. **Example migration files:**
+
+   `migrations/000002_create_posts_table.up.sql`:
+   ```sql
+   CREATE TABLE IF NOT EXISTS posts (
+       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       title VARCHAR(255) NOT NULL,
+       content TEXT NOT NULL,
+       user_id UUID NOT NULL REFERENCES users(id),
+       status VARCHAR(20) NOT NULL DEFAULT 'draft',
+       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+   );
+   
+   CREATE INDEX idx_posts_user_id ON posts(user_id);
+   ```
+
+   `migrations/000002_create_posts_table.down.sql`:
+   ```sql
+   DROP TABLE IF EXISTS posts;
+   ```
+
+3. **Run migrations** - Restart the application to apply new migrations:
+   ```bash
+   $ go run ./cmd/main.go
+   ```
+
+### Migration Naming Convention
+
+- Start with a 6-digit number (000001, 000002, etc.)
+- Use underscores to separate words
+- Must have `.up.sql` and `.down.sql` files
+- Numbers must be sequential and unique
+
+### Manual Migration (CLI)
+
+You can also run migrations manually using the migrate CLI:
+
+```bash
+# Apply all pending migrations
+migrate -path ./migrations -database "postgres://user:password@localhost:5432/dbname?sslmode=disable" up
+
+# Rollback one migration
+migrate -path ./migrations -database "postgres://user:password@localhost:5432/dbname?sslmode=disable" down
+
+# Check migration status
+migrate -path ./migrations -database "postgres://user:password@localhost:5432/dbname?sslmode=disable" version
+```
 
 
-Read the entire article here: [https://codevoweb.com/golang-gorm-fiber-jwt-authentication/](https://codevoweb.com/golang-gorm-fiber-jwt-authentication/)
 
