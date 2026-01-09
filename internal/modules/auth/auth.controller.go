@@ -1,4 +1,4 @@
-package controllers
+package handler
 
 import (
 	"fmt"
@@ -7,19 +7,20 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt"
-	"github.com/wpcodevo/golang-fiber-jwt/initializers"
-	"github.com/wpcodevo/golang-fiber-jwt/models"
+	"github.com/wpcodevo/golang-fiber-jwt/config"
+	"github.com/wpcodevo/golang-fiber-jwt/internal/modules/auth/dto"
+	"github.com/wpcodevo/golang-fiber-jwt/internal/modules/entity"
 	"golang.org/x/crypto/bcrypt"
 )
 
 func SignUpUser(c *fiber.Ctx) error {
-	var payload *models.SignUpInput
+	var payload *dto.SignUpInput
 
 	if err := c.BodyParser(&payload); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "fail", "message": err.Error()})
 	}
 
-	errors := models.ValidateStruct(payload)
+	errors := dto.ValidateStruct(payload)
 	if errors != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "fail", "errors": errors})
 
@@ -36,39 +37,60 @@ func SignUpUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "fail", "message": err.Error()})
 	}
 
-	newUser := models.User{
+	newUser := entity.User{
 		Name:     payload.Name,
 		Email:    strings.ToLower(payload.Email),
 		Password: string(hashedPassword),
 		Photo:    &payload.Photo,
 	}
 
-	result := initializers.DB.Create(&newUser)
+	// Begin transaction
+	tx := config.DB.Begin()
+	if tx.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "error", "message": "Failed to start transaction"})
+	}
+
+	// Defer rollback in case of panic
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	result := tx.Create(&newUser)
 
 	if result.Error != nil && strings.Contains(result.Error.Error(), "duplicate key value violates unique") {
+		tx.Rollback()
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"status": "fail", "message": "User with that email already exists"})
 	} else if result.Error != nil {
+		tx.Rollback()
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"status": "error", "message": "Something bad happened"})
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"status": "success", "data": fiber.Map{"user": models.FilterUserRecord(&newUser)}})
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"status": "error", "message": "Failed to commit transaction"})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"status": "success", "data": fiber.Map{"user": dto.FilterUserRecord(&newUser)}})
 }
 
 func SignInUser(c *fiber.Ctx) error {
-	var payload *models.SignInInput
+	var payload *dto.SignInInput
 
 	if err := c.BodyParser(&payload); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "fail", "message": err.Error()})
 	}
 
-	errors := models.ValidateStruct(payload)
+	errors := dto.ValidateStruct(payload)
 	if errors != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(errors)
 
 	}
 
-	var user models.User
-	result := initializers.DB.First(&user, "email = ?", strings.ToLower(payload.Email))
+	var user entity.User
+	result := config.DB.First(&user, "email = ?", strings.ToLower(payload.Email))
 	if result.Error != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "fail", "message": "Invalid email or Password"})
 	}
@@ -78,7 +100,7 @@ func SignInUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"status": "fail", "message": "Invalid email or Password"})
 	}
 
-	config, _ := initializers.LoadConfig(".")
+	config, _ := config.LoadConfig(".")
 
 	tokenByte := jwt.New(jwt.SigningMethodHS256)
 

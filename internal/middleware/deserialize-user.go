@@ -6,14 +6,16 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt"
-	"github.com/wpcodevo/golang-fiber-jwt/initializers"
-	"github.com/wpcodevo/golang-fiber-jwt/models"
+	initializers "github.com/wpcodevo/golang-fiber-jwt/config"
+	"github.com/wpcodevo/golang-fiber-jwt/internal/modules/auth/dto"
+	"github.com/wpcodevo/golang-fiber-jwt/internal/modules/entity"
 )
 
 func DeserializeUser(c *fiber.Ctx) error {
 	var tokenString string
 	authorization := c.Get("Authorization")
 
+	fmt.Println("Auth:", authorization)
 	if strings.HasPrefix(authorization, "Bearer ") {
 		tokenString = strings.TrimPrefix(authorization, "Bearer ")
 	} else if c.Cookies("token") != "" {
@@ -43,14 +45,14 @@ func DeserializeUser(c *fiber.Ctx) error {
 
 	}
 
-	var user models.User
+	var user entity.User
 	initializers.DB.First(&user, "id = ?", fmt.Sprint(claims["sub"]))
 
 	if user.ID.String() != claims["sub"] {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"status": "fail", "message": "the user belonging to this token no logger exists"})
 	}
 
-	c.Locals("user", models.FilterUserRecord(&user))
+	c.Locals("user", dto.FilterUserRecord(&user))
 
 	return c.Next()
 }

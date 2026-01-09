@@ -8,7 +8,6 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/uuid v1.3.0
 	github.com/spf13/viper v1.15.0
-	github.com/wpcodevo/golang-fiber v0.0.0-20230129125335-c91d2c6069e6
 	golang.org/x/crypto v0.4.0
 	gorm.io/driver/postgres v1.4.6
 	gorm.io/gorm v1.24.3
